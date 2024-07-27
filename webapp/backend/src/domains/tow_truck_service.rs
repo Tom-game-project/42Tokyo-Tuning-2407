@@ -120,7 +120,7 @@ impl<
                 (distance, truck)
             })
             .collect();
-        let min_tow_tuple=min_tow_truck(tow_trucks_with_distance);
+        let min_tow_tuple = min_tow_truck(tow_trucks_with_distance);
 
         if let Some((min_distance, min_tow)) = min_tow_tuple{
             if min_distance > 10000000 {
