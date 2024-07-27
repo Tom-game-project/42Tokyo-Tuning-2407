@@ -100,33 +100,75 @@ impl<
             graph.add_edge(edge);
         }
 
-        let sorted_tow_trucks_by_distance = {
-            let mut tow_trucks_with_distance: Vec<_> = tow_trucks
-                .into_iter()
-                .map(|truck| {
-                    let distance = calculate_distance(&graph, truck.node_id, order.node_id);
-                    (distance, truck)
-                })
-                .collect();
+        // let sorted_tow_trucks_by_distance = {
+        //     let mut tow_trucks_with_distance: Vec<_> = tow_trucks
+        //         .into_iter()
+        //         .map(|truck| {
+        //             let distance = calculate_distance(&graph, truck.node_id, order.node_id);
+        //             (distance, truck)
+        //         })
+        //         .collect();
 
-            tow_trucks_with_distance.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-            tow_trucks_with_distance
-        };
+        //     tow_trucks_with_distance.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        //     tow_trucks_with_distance
+        // };
 
-        if sorted_tow_trucks_by_distance.is_empty() || sorted_tow_trucks_by_distance[0].0 > 10000000
-        {
+        let tow_trucks_with_distance: Vec<_> = tow_trucks
+            .into_iter()
+            .map(|truck| {
+                let distance = calculate_distance(&graph, truck.node_id, order.node_id);
+                (distance, truck)
+            })
+            .collect();
+        let min_tow_tuple=min_tow_truck(tow_trucks_with_distance);
+
+        if let Some((min_distance, min_tow)) = min_tow_tuple{
+            if min_distance > 10000000 {
+                return Ok(None);
+            }
+            return Ok(Some(
+                TowTruckDto::from_entity(min_tow)
+            ));
+        }else{
             return Ok(None);
         }
 
-        let sorted_tow_truck_dtos: Vec<TowTruckDto> = sorted_tow_trucks_by_distance
-            .into_iter()
-            .map(|(_, truck)| TowTruckDto::from_entity(truck))
-            .collect();
+        // if sorted_tow_trucks_by_distance.is_empty() || sorted_tow_trucks_by_distance[0].0 > 10000000
+        // {
+        //     return Ok(None);
+        // }
 
-        Ok(sorted_tow_truck_dtos.first().cloned())
+        // let sorted_tow_truck_dtos: Vec<TowTruckDto> = sorted_tow_trucks_by_distance
+        //     .into_iter()
+        //     .map(|(_, truck)| TowTruckDto::from_entity(truck))
+        //     .collect();
+
+        // Ok(sorted_tow_truck_dtos.first().cloned())
     }
 }
 
 fn calculate_distance(graph: &Graph, node_id_1: i32, node_id_2: i32) -> i32 {
     graph.shortest_path(node_id_1, node_id_2)
+}
+
+/// # min_tow_truck 
+/// ## 距離が最小のレッカー車を保持する
+fn min_tow_truck(a:Vec<(i32, TowTruck)>) -> Option<(i32 ,TowTruck)>{
+    let mut tmp :Option<(i32, TowTruck)> = None;
+
+    for i in a{
+        if let Some(ref e) = tmp{
+            if e.0 > i.0{
+                tmp = Some(i);
+            }
+        }else{
+            tmp = Some(i);
+        }
+    }
+
+    if let Some(ref e) = tmp{
+        return Some(e.clone());
+    }else{
+        return None;
+    }
 }
