@@ -10,6 +10,11 @@ use crate::utils::{generate_session_token, hash_password, verify_password};
 
 use super::dto::auth::LoginResponseDto;
 
+//AI
+// use std::path::PathBuf;
+use image::{DynamicImage, GenericImageView, ImageOutputFormat};
+use std::io::Cursor;
+
 pub trait AuthRepository {
     async fn create_user(&self, username: &str, password: &str, role: &str)
         -> Result<(), AppError>;
@@ -167,27 +172,27 @@ impl<T: AuthRepository + std::fmt::Debug> AuthService<T> {
         let path: PathBuf =
             Path::new(&format!("images/user_profile/{}", profile_image_name)).to_path_buf();
 
-        let output = Command::new("magick")
-            .arg(&path)
-            .arg("-resize")
-            .arg("500x500")
-            .arg("png:-")
-            .output()
-            .map_err(|e| {
-                error!("画像リサイズのコマンド実行に失敗しました: {:?}", e);
+
+        // 追加
+        let img = image::open(&path).map_err(|e| {
+            error!("画像の読み込みに失敗しました: {:?}", e);
+            AppError::InternalServerError
+        })?;
+        
+        let resized_img = img.resize(500, 500, image::imageops::FilterType::Lanczos3);
+
+        // バッファにPNG形式で書き込む
+        let mut buffer =Vec::new();
+        {
+            let mut cursor = Cursor::new(&mut buffer);
+            resized_img.write_to(&mut cursor, ImageOutputFormat::Png).map_err(|e| {
+                error!("画像の書き込みに失敗しました: {:?}", e);
+                // String::from_utf8_lossy(&output.stderr)
                 AppError::InternalServerError
             })?;
-
-        match output.status.success() {
-            true => Ok(Bytes::from(output.stdout)),
-            false => {
-                error!(
-                    "画像リサイズのコマンド実行に失敗しました: {:?}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-                Err(AppError::InternalServerError)
-            }
         }
+        
+        Ok(buffer.into())
     }
 
     pub async fn validate_session(&self, session_token: &str) -> Result<bool, AppError> {
