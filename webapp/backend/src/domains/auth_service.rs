@@ -170,7 +170,7 @@ impl<T: AuthRepository + std::fmt::Debug> AuthService<T> {
         let output = Command::new("magick")
             .arg(&path)
             .arg("-resize")
-            .arg("500x500")
+            .arg("50x50")
             .arg("png:-")
             .output()
             .map_err(|e| {
