@@ -79,7 +79,7 @@ impl Graph {
 
         distances.get(&to_node_id).cloned().unwrap_or(i32::MAX)
     }
-
+    
     pub fn shortest_path2(&self, from_node_id: i32, to_node_id: i32) -> i32{
         // key is node_id
         let mut hashnode_with_cost:HashMap<i32, (Num, &Node)>=HashMap::new();
@@ -100,16 +100,16 @@ impl Graph {
                 break;
             }
             let next_edges = self.edges.get(&current_node).unwrap();
-            footprint.push(current_node);
             for edge in next_edges{
-                if edge.node_a_id == pre_node || edge.node_b_id == pre_node{
+                if (footprint.contains(&edge.node_a_id) && edge.node_b_id == current_node) || (footprint.contains(&edge.node_b_id) && edge.node_a_id == current_node){
                     continue;
                 }
                 let current_versus_node = if current_node == edge.node_a_id{
                     edge.node_b_id
-                }else{
+                } else {
                     edge.node_a_id
                 };
+                
                 if let (Num::NUMBER(old_cost), node) = hashnode_with_cost.get(&current_versus_node).unwrap(){
                     // nodeが既に探索済み
                     let new_cost = current_cost + edge.weight;
@@ -117,25 +117,28 @@ impl Graph {
                         hashnode_with_cost.insert(current_versus_node, (Num::NUMBER(new_cost),node));
                         cost_node_vec.push((new_cost/*新しい最小のコスト*/,current_versus_node/*新しい最小のコストのノード*/));
                     }
-                }else{
+                } else {
                     let node = hashnode_with_cost.get(&current_versus_node).unwrap().1;
                     // nodeのコストが無限だった場合 値を更新
                     let new_cost = current_cost + edge.weight;
+                    // println!("{:?} {}",node,new_cost);
                     hashnode_with_cost.insert(current_versus_node, (Num::NUMBER(new_cost),node));
                     cost_node_vec.push((new_cost/*新しい最小のコスト*/,current_versus_node/*新しい最小のコストのノード*/));
                 }
             }
             pre_node = current_node;
+            //println!("a cur_node:{} cost:{} cost_node:{:?} ", current_node, current_cost, cost_node_vec);
+            footprint.push(current_node);
             (current_cost,current_node) = *cost_node_vec.iter().min_by_key(|&&(a,_)| a).unwrap();
-            // cost_node_vec.retain(|&(_,n)| !footprint.contains(&n));
-            for (i,j) in cost_node_vec.iter().enumerate(){
-                if !footprint.contains(&j.0){
+            //println!("b cur_node:{} cost:{} cost_node:{:?} ", current_node, current_cost, cost_node_vec);
+            //cost_node_vec.retain(|&(_,n)| !footprint.contains(&n));
+            for (i,(_,node)) in cost_node_vec.iter().enumerate(){
+                if footprint.contains(&node){
                     cost_node_vec.remove(i);
                     break;
                 }
             }
         }
         return current_cost;
-    }
-    
+    } 
 }
