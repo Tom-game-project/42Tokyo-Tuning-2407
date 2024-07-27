@@ -154,40 +154,33 @@ impl<T: AuthRepository + std::fmt::Debug> AuthService<T> {
     }
 
     pub async fn get_resized_profile_image_byte(&self, user_id: i32) -> Result<Bytes, AppError> {
-        let profile_image_name = match self
-            .repository
-            .find_profile_image_name_by_user_id(user_id)
-            .await
-        {
+        let profile_image_name = match self.repository.find_profile_image_name_by_user_id(user_id).await {
             Ok(Some(name)) => name,
             Ok(None) => return Err(AppError::NotFound),
             Err(_) => return Err(AppError::NotFound),
         };
 
-        let path: PathBuf =
-            Path::new(&format!("images/user_profile/{}", profile_image_name)).to_path_buf();
+        // 画像ファイルパスの構築
+        let path = format!("images/user_profile/{}", profile_image_name);
 
-        let output = Command::new("magick")
-            .arg(&path)
-            .arg("-resize")
-            .arg("500x500")
-            .arg("png:-")
-            .output()
-            .map_err(|e| {
-                error!("画像リサイズのコマンド実行に失敗しました: {:?}", e);
+        // 画像のリサイズ処理
+        let resized_image_bytes = task::spawn_blocking(move || {
+            let img = image::open(&path).map_err(|e| {
+                error!("画像の読み込みに失敗しました: {:?}", e);
                 AppError::InternalServerError
             })?;
+            let resized_img = img.resize(500, 500, FilterType::Lanczos3);
 
-        match output.status.success() {
-            true => Ok(Bytes::from(output.stdout)),
-            false => {
-                error!(
-                    "画像リサイズのコマンド実行に失敗しました: {:?}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-                Err(AppError::InternalServerError)
-            }
-        }
+            let mut buffer = Vec::new();
+            resized_img.write_to(&mut buffer, ImageFormat::Png).map_err(|e| {
+                error!("画像のリサイズまたは書き出しに失敗しました: {:?}", e);
+                AppError::InternalServerError
+            })?;
+            Ok(Bytes::from(buffer))
+        }).await.map_err(|_| AppError::InternalServerError)??;
+
+        Ok(resized_image_bytes)
+
     }
 
     pub async fn validate_session(&self, session_token: &str) -> Result<bool, AppError> {
