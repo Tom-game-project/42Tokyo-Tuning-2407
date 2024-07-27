@@ -3,6 +3,7 @@ use std::process::Command;
 
 use actix_web::web::Bytes;
 use log::error;
+use tokio::process::Command as AsyncCommand;
 
 use crate::errors::AppError;
 use crate::models::user::{Dispatcher, Session, User};
@@ -65,41 +66,40 @@ impl<T: AuthRepository + std::fmt::Debug> AuthService<T> {
 
         let session_token = generate_session_token();
 
-        match self.repository.find_user_by_username(username).await? {
-            Some(user) => {
-                self.repository
-                    .create_session(user.id, &session_token)
-                    .await?;
-                match user.role.as_str() {
-                    "dispatcher" => {
-                        self.repository
-                            .create_dispatcher(user.id, area.unwrap())
-                            .await?;
-                        let dispatcher = self
-                            .repository
-                            .find_dispatcher_by_user_id(user.id)
-                            .await?
-                            .unwrap();
-                        Ok(LoginResponseDto {
-                            user_id: user.id,
-                            username: user.username,
-                            session_token,
-                            role: user.role,
-                            dispatcher_id: Some(dispatcher.id),
-                            area_id: Some(dispatcher.area_id),
-                        })
-                    }
-                    _ => Ok(LoginResponseDto {
+        if let Some(user) =  self.repository.find_user_by_username(username).await? {
+            self.repository
+                .create_session(user.id, &session_token)
+                .await?;
+            match user.role.as_str() {
+                "dispatcher" => {
+                    self.repository
+                        .create_dispatcher(user.id, area.unwrap())
+                        .await?;
+                    let dispatcher = self
+                        .repository
+                        .find_dispatcher_by_user_id(user.id)
+                        .await?
+                        .unwrap();
+                    Ok(LoginResponseDto {
                         user_id: user.id,
                         username: user.username,
                         session_token,
                         role: user.role,
-                        dispatcher_id: None,
-                        area_id: None,
-                    }),
+                        dispatcher_id: Some(dispatcher.id),
+                        area_id: Some(dispatcher.area_id),
+                    })
                 }
+                _ => Ok(LoginResponseDto {
+                    user_id: user.id,
+                    username: user.username,
+                    session_token,
+                    role: user.role,
+                    dispatcher_id: None,
+                    area_id: None,
+                }),
             }
-            None => Err(AppError::InternalServerError),
+        }else{
+            Err(AppError::InternalServerError)
         }
     }
 
@@ -108,43 +108,43 @@ impl<T: AuthRepository + std::fmt::Debug> AuthService<T> {
         username: &str,
         password: &str,
     ) -> Result<LoginResponseDto, AppError> {
-        match self.repository.find_user_by_username(username).await? {
-            Some(user) => {
-                let is_password_valid = verify_password(&user.password, password).unwrap();
-                if !is_password_valid {
-                    return Err(AppError::Unauthorized);
-                }
-
-                let session_token = generate_session_token();
-                self.repository
-                    .create_session(user.id, &session_token)
-                    .await?;
-
-                match user.role.as_str() {
-                    "dispatcher" => {
-                        match self.repository.find_dispatcher_by_user_id(user.id).await? {
-                            Some(dispatcher) => Ok(LoginResponseDto {
-                                user_id: user.id,
-                                username: user.username,
-                                session_token,
-                                role: user.role.clone(),
-                                dispatcher_id: Some(dispatcher.id),
-                                area_id: Some(dispatcher.area_id),
-                            }),
-                            None => Err(AppError::InternalServerError),
-                        }
-                    }
-                    _ => Ok(LoginResponseDto {
-                        user_id: user.id,
-                        username: user.username,
-                        session_token,
-                        role: user.role.clone(),
-                        dispatcher_id: None,
-                        area_id: None,
-                    }),
-                }
+        if let Some(user) = self.repository.find_user_by_username(username).await? {
+            let is_password_valid = verify_password(&user.password, password).unwrap();
+            if !is_password_valid {
+                return Err(AppError::Unauthorized);
             }
-            None => Err(AppError::Unauthorized),
+             
+            let session_token = generate_session_token();
+            self.repository
+                .create_session(user.id, &session_token)
+                .await?;
+             
+            match user.role.as_str() {
+                "dispatcher" => {
+                    if let Some(dispatcher) = self.repository.find_dispatcher_by_user_id(user.id).await? {
+                        Ok(LoginResponseDto {
+                            user_id: user.id,
+                            username: user.username,
+                            session_token,
+                            role: user.role.clone(),
+                            dispatcher_id: Some(dispatcher.id),
+                            area_id: Some(dispatcher.area_id),
+                        })
+                    }else{
+                        Err(AppError::InternalServerError)
+                    }
+                }
+                _ => Ok(LoginResponseDto {
+                    user_id: user.id,
+                    username: user.username,
+                    session_token,
+                    role: user.role.clone(),
+                    dispatcher_id: None,
+                    area_id: None,
+                }),
+            }
+        }else{
+            Err(AppError::Unauthorized)
         }
     }
 
@@ -167,12 +167,13 @@ impl<T: AuthRepository + std::fmt::Debug> AuthService<T> {
         let path: PathBuf =
             Path::new(&format!("images/user_profile/{}", profile_image_name)).to_path_buf();
 
-        let output = Command::new("magick")
+        let output = AsyncCommand::new("magick")
             .arg(&path)
             .arg("-resize")
             .arg("500x500")
             .arg("png:-")
             .output()
+            .await
             .map_err(|e| {
                 error!("画像リサイズのコマンド実行に失敗しました: {:?}", e);
                 AppError::InternalServerError
