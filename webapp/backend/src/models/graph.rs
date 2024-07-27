@@ -87,7 +87,6 @@ impl Graph {
         for (i,node) in &self.nodes{
             hashnode_with_cost.insert(*i, (Num::INF, node));
         }
-        let mut pre_node:i32 = -1;
         let mut current_node:i32 = from_node_id;
         let mut current_cost:i32= 0;
         let mut cost_node_vec:Vec<(i32,i32)> = Vec::new();
@@ -126,7 +125,6 @@ impl Graph {
                     cost_node_vec.push((new_cost/*新しい最小のコスト*/,current_versus_node/*新しい最小のコストのノード*/));
                 }
             }
-            pre_node = current_node;
             //println!("a cur_node:{} cost:{} cost_node:{:?} ", current_node, current_cost, cost_node_vec);
             footprint.push(current_node);
             (current_cost,current_node) = *cost_node_vec.iter().min_by_key(|&&(a,_)| a).unwrap();
