@@ -127,7 +127,13 @@ impl Graph {
             }
             pre_node = current_node;
             (current_cost,current_node) = *cost_node_vec.iter().min_by_key(|&&(a,_)| a).unwrap();
-            cost_node_vec.retain(|&(_,n)| !footprint.contains(&n));
+            // cost_node_vec.retain(|&(_,n)| !footprint.contains(&n));
+            for (i,j) in cost_node_vec.iter().enumerate(){
+                if !footprint.contains(&j.0){
+                    cost_node_vec.remove(i);
+                    break;
+                }
+            }
         }
         return current_cost;
     }
