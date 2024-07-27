@@ -66,9 +66,6 @@ impl Graph {
                         if new_distance < *current_distance {
                             distances.insert(edge.node_b_id, new_distance);
                         }
-                        if let Some(e) = distances.get(&to_node_id){
-                            return e.clone();
-                        }
                     }
                 }
             }
