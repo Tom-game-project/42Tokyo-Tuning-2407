@@ -11,7 +11,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # e2eテスト
-(cd webapp/e2e && bash ./run_e2e_test.sh)
+ (cd webapp/e2e && bash ./run_e2e_test.sh)
 if [ $? -ne 0 ]; then
     echo -e "採点フローを中断します。"
     exit 1
